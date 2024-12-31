@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>画直线闯关游戏</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            touch-action: none;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #gameCanvas {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            touch-action: none;
+        }
+
+        .info-panel {
+            width: 100%;
+            max-width: 300px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+        }
+
+        #level {
+            color: #2196F3;
+        }
+
+        #score {
+            color: #4CAF50;
+        }
+
+        #lives {
+            color: #f44336;
+        }
+
+        .message {
+            margin: 10px 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="info-panel">
+        <span id="level">第1关</span>
+        <span id="score">得分: 0</span>
+        <span id="lives">❤️❤️❤️</span>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="message" id="message">画一条直线连接绿点和红点</div>
+    <button id="nextBtn">开始游戏</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageDiv = document.getElementById('message');
+        const nextBtn = document.getElementById('nextBtn');
+        const levelSpan = document.getElementById('level');
+        const scoreSpan = document.getElementById('score');
+        const livesSpan = document.getElementById('lives');
+
+        canvas.width = Math.min(window.innerWidth - 40, 300);
+        canvas.height = Math.min(window.innerHeight - 150, 400);
+
+        let isDrawing = false;
+        let points = [];
+        let currentLevel = 1;
+        let totalScore = 0;
+        let lives = 3;
+        let startPoint = { x: canvas.width / 2, y: 50 };
+        let endPoint = { x: canvas.width / 2, y: canvas.height - 50 };
+        let isGameOver = false;
+
+        // 根据关卡设置难度
+        function setLevelPoints() {
+            const margin = 30;
+            const maxOffset = Math.min(50 + currentLevel * 10, canvas.width / 2 - margin);
+
+            // 起点和终点的X坐标随机偏移
+            startPoint.x = canvas.width / 2 + (Math.random() * maxOffset * 2 - maxOffset);
+            endPoint.x = canvas.width / 2 + (Math.random() * maxOffset * 2 - maxOffset);
+
+            // Y坐标也稍微随机化
+            startPoint.y = margin + Math.random() * 50;
+            endPoint.y = canvas.height - margin - Math.random() * 50;
+        }
+
+        function drawPoints() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 画起点（绿色）
+            ctx.beginPath();
+            ctx.arc(startPoint.x, startPoint.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'green';
+            ctx.fill();
+
+            // 画终点（红色）
+            ctx.beginPath();
+            ctx.arc(endPoint.x, endPoint.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+        }
+
+        function getPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function startDraw(e) {
+            if (isGameOver) return;
+            e.preventDefault();
+            isDrawing = true;
+            points = [];
+            const pos = getPosition(e);
+            points.push(pos);
+
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+        }
+
+        function drawing(e) {
+            if (!isDrawing || isGameOver) return;
+            e.preventDefault();
+
+            const pos = getPosition(e);
+            points.push(pos);
+
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function calculateScore() {
+            if (points.length < 2) return 0;
+
+            // 计算线条的直线度
+            let maxDeviation = 0;
+            const idealSlope = (endPoint.y - startPoint.y) / (endPoint.x - startPoint.x);
+            const idealIntercept = startPoint.y - idealSlope * startPoint.x;
+
+            for (let point of points) {
+                const idealY = idealSlope * point.x + idealIntercept;
+                const deviation = Math.abs(point.y - idealY);
+                maxDeviation = Math.max(maxDeviation, deviation);
+            }
+
+            // 计算起点和终点的命中精度
+            const startDeviation = Math.hypot(points[0].x - startPoint.x, points[0].y - startPoint.y);
+            const endDeviation = Math.hypot(points[points.length - 1].x - endPoint.x, points[points.length - 1].y - endPoint.y);
+
+            // 综合评分
+            const lineScore = Math.max(0, 100 - (maxDeviation * 2));
+            const pointsScore = Math.max(0, 100 - (startDeviation + endDeviation) * 2);
+
+            return Math.round((lineScore + pointsScore) / 2);
+        }
+
+        function endDraw(e) {
+            if (!isDrawing || isGameOver) return;
+            e.preventDefault();
+            isDrawing = false;
+
+            const score = calculateScore();
+            const passingScore = Math.max(60, 60 + currentLevel * 2); // 随关卡提高通关要求
+
+            if (score >= passingScore) {
+                totalScore += score;
+                currentLevel++;
+                messageDiv.textContent = `太棒了！得分：${score}分，点击按钮进入第${currentLevel}关`;
+                nextBtn.textContent = '下一关';
+                scoreSpan.textContent = `得分: ${totalScore}`;
+                levelSpan.textContent = `第${currentLevel}关`;
+            } else {
+                lives--;
+                livesSpan.textContent = '❤️'.repeat(lives);
+                messageDiv.textContent = `得分：${score}分，未达到通关分数${passingScore}分，请重试`;
+
+                if (lives <= 0) {
+                    gameOver();
+                    return;
+                }
+
+                nextBtn.textContent = '重试';
+            }
+
+            nextBtn.style.display = 'block';
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            messageDiv.textContent = `游戏结束！总分：${totalScore}，达到第${currentLevel}关`;
+            nextBtn.textContent = '重新开始游戏';
+        }
+
+        function nextLevel() {
+            if (isGameOver) {
+                // 重置游戏
+                currentLevel = 1;
+                totalScore = 0;
+                lives = 3;
+                isGameOver = false;
+                levelSpan.textContent = `第${currentLevel}关`;
+                scoreSpan.textContent = `得分: ${totalScore}`;
+                livesSpan.textContent = '❤️❤️❤️';
+                messageDiv.textContent = '画一条直线连接绿点和红点';
+            }
+
+            setLevelPoints();
+            drawPoints();
+            nextBtn.style.display = 'none';
+        }
+
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchmove', drawing, { passive: false });
+        canvas.addEventListener('touchend', endDraw, { passive: false });
+
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', drawing);
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('mouseleave', endDraw);
+
+        nextBtn.addEventListener('click', nextLevel);
+
+        // 初始化游戏
+        drawPoints();
+    </script>
+</body>
+
+</html>

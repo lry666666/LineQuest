@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>画直线游戏</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            touch-action: none;
+        }
+
+        #score {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">开始画线</div>
+    <button id="resetBtn">重新开始</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDiv = document.getElementById('score');
+
+        // 设置画布大小
+        canvas.width = Math.min(window.innerWidth - 40, 300);
+        canvas.height = Math.min(window.innerHeight - 150, 400);
+
+        let isDrawing = false;
+        let points = [];
+        const startY = 50;
+        const endY = canvas.height - 50;
+
+        function drawPoints() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 画起点（绿色）
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, startY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'green';
+            ctx.fill();
+
+            // 画终点（红色）
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, endY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+        }
+
+        function getPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function startDraw(e) {
+            e.preventDefault();
+            isDrawing = true;
+            points = [];
+            const pos = getPosition(e);
+            points.push(pos);
+
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+        }
+
+        function drawing(e) {
+            e.preventDefault();
+            if (!isDrawing) return;
+
+            const pos = getPosition(e);
+            points.push(pos);
+
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function endDraw(e) {
+            e.preventDefault();
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            // 计算得分
+            let maxDeviation = 0;
+            const centerX = canvas.width / 2;
+
+            for (let point of points) {
+                const deviation = Math.abs(point.x - centerX);
+                maxDeviation = Math.max(maxDeviation, deviation);
+            }
+
+            const score = Math.max(0, 100 - (maxDeviation * 2));
+            const finalScore = Math.round(score);
+
+            let comment = '';
+            if (finalScore >= 90) comment = '（太棒了！）';
+            else if (finalScore >= 70) comment = '（不错哦）';
+            else if (finalScore >= 50) comment = '（继续加油）';
+            else comment = '（再试一次）';
+
+            scoreDiv.textContent = `得分：${finalScore}分 ${comment}`;
+        }
+
+        // 重置游戏
+        function resetGame() {
+            drawPoints();
+            scoreDiv.textContent = '开始画线';
+        }
+
+        // 添加事件监听
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchmove', drawing, { passive: false });
+        canvas.addEventListener('touchend', endDraw, { passive: false });
+
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', drawing);
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('mouseleave', endDraw);
+
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+
+        // 初始化游戏
+        drawPoints();
+    </script>
+</body>
+
+</html>
